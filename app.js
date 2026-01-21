@@ -88,6 +88,15 @@ app.get("/api/products", async (req, res) => {
     products: productsList,
   });
 });
+app.get("/api/products/:id", async (req, res) => {
+  try {
+    const product = await products.findOne({ _id: new ObjectId(req.params.id) });
+    if (!product) return res.status(404).json({ error: "Product not found" });
+    res.json(product);
+  } catch (err) {
+    res.status(400).json({ error: "Invalid ID format" });
+  }
+});
 
 app.post("/api/products", async (req, res) => {
   const { name, price, category } = req.body;
