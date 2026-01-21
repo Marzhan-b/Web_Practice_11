@@ -106,6 +106,28 @@ app.post("/api/products", async (req, res) => {
     id: result.insertedId,
   });
 });
+app.put("/api/products/:id", async (req, res) => {
+  try {
+    const { name, price, category } = req.body;
+    const result = await products.updateOne(
+      { _id: new ObjectId(req.params.id) },
+      { $set: { name, price: Number(price), category } }
+    );
+    if (result.matchedCount === 0) return res.status(404).json({ error: "Product not found" });
+    res.json({ message: "Updated successfully" });
+  } catch (err) {
+    res.status(400).json({ error: "Invalid ID or data" });
+  }
+});
+app.delete("/api/products/:id", async (req, res) => {
+  try {
+    const result = await products.deleteOne({ _id: new ObjectId(req.params.id) });
+    if (result.deletedCount === 0) return res.status(404).json({ error: "Product not found" });
+    res.json({ message: "Deleted successfully" });
+  } catch (err) {
+    res.status(400).json({ error: "Invalid ID format" });
+  }
+});
 
 app.use((req, res) => {
   res.status(404).json({ error: "API endpoint not found" });
