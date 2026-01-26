@@ -137,6 +137,11 @@ app.delete("/api/products/:id", async (req, res) => {
     res.status(400).json({ error: "Invalid ID format" });
   }
 });
+app.get("/health", (req, res) => {
+  res.json({
+    status: "ok"
+  });
+});
 
 app.use((req, res) => {
   res.status(404).json({ error: "API endpoint not found" });
