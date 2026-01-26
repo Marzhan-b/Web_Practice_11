@@ -40,8 +40,7 @@ app.get("/", (req, res) => {
   res.send(`
     <h1>Shop API</h1>
     <ul>
-      <li><a href="/api/products">/api/products</a></li>
-      <li><a href="/api/products/1">/api/products/1</a></li>
+      <li><a href="/api/health">/api/health</a></li>
     </ul>
   `);
 });
