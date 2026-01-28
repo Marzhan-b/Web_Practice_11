@@ -9,7 +9,7 @@ const MONGO_URL = process.env.MONGO_URI;
 
 const client = new MongoClient(MONGO_URL);
 
-let products;
+let items;
 
 app.use((req, res, next) => {
   console.log(req.method, req.url);
@@ -24,7 +24,7 @@ async function startServer() {
     console.log("MongoDB connected");
 
     const db = client.db("shop");
-    products = db.collection("products");
+    items = db.collection("items");
 
     app.listen(PORT, () => {
       console.log(`Server running at http://localhost:${PORT}`);
@@ -37,109 +37,95 @@ async function startServer() {
 startServer();
 
 app.get("/", (req, res) => {
-  res.send(`
-    <h1>Shop API</h1>
-    <ul>
-      <li><a href="/api/health">/api/health</a></li>
-    </ul>
-  `);
+  res.send("<h1>Items API</h1>");
 });
 
-app.get("/api/products", async (req, res) => {
-  const { category, minPrice, sort, fields } = req.query;
 
-  const filter = {};
-  if (category) {
-    filter.category = category;
-  }
-  if (minPrice) {
-    filter.price = { $gte: Number(minPrice) };
-  }
-
-  const sortOption = {};
-  if (sort === "price") {
-    sortOption.price = 1;
-  }
-
-  let projection = null;
-  if (fields) {
-    projection = {};
-    fields.split(",").forEach((field) => {
-      projection[field] = 1;
-    });
-    projection._id = 0;
-  }
-
-  let query = products.find(filter);
-
-  if (sort) {
-    query = query.sort(sortOption);
-  }
-
-  if (projection) {
-    query = query.project(projection);
-  }
-
-  const productsList = await query.toArray();
-
-  res.json({
-    count: productsList.length,
-    products: productsList,
-  });
+// GET 
+app.get("/api/items", async (req, res) => {
+  const list = await items.find().toArray();
+  res.status(200).json(list);
 });
-app.get("/api/products/:id", async (req, res) => {
+
+
+// GET
+app.get("/api/items/:id", async (req, res) => {
   try {
-    const product = await products.findOne({ _id: new ObjectId(req.params.id) });
-    if (!product) return res.status(404).json({ error: "Product not found" });
-    res.json(product);
-  } catch (err) {
-    res.status(400).json({ error: "Invalid ID format" });
+    const item = await items.findOne({ _id: new ObjectId(req.params.id) });
+    if (!item) return res.status(404).json({ error: "Item not found" });
+    res.json(item);
+  } catch {
+    res.status(400).json({ error: "Invalid ID" });
   }
 });
 
-app.post("/api/products", async (req, res) => {
-  const { name, price, category } = req.body;
 
-  if (!name || price === undefined || !category) {
-    return res.status(400).json({ error: "Missing required fields" });
+// POST 
+app.post("/api/items", async (req, res) => {
+  const { name } = req.body;
+
+  if (!name) {
+    return res.status(400).json({ error: "Name is required" });
   }
 
-  const result = await products.insertOne({
-    name,
-    price,
-    category,
-  });
-
-  res.status(201).json({
-    id: result.insertedId,
-  });
+  const result = await items.insertOne(req.body);
+  res.status(201).json({ id: result.insertedId });
 });
-app.put("/api/products/:id", async (req, res) => {
+
+
+// PUT
+app.put("/api/items/:id", async (req, res) => {
   try {
-    const { name, price, category } = req.body;
-    const result = await products.updateOne(
+    const result = await items.updateOne(
       { _id: new ObjectId(req.params.id) },
-      { $set: { name, price: Number(price), category } }
+      { $set: req.body }
     );
-    if (result.matchedCount === 0) return res.status(404).json({ error: "Product not found" });
+
+    if (result.matchedCount === 0)
+      return res.status(404).json({ error: "Item not found" });
+
     res.json({ message: "Updated successfully" });
-  } catch (err) {
+  } catch {
     res.status(400).json({ error: "Invalid ID or data" });
   }
 });
-app.delete("/api/products/:id", async (req, res) => {
+
+
+// PATCH 
+app.patch("/api/items/:id", async (req, res) => {
   try {
-    const result = await products.deleteOne({ _id: new ObjectId(req.params.id) });
-    if (result.deletedCount === 0) return res.status(404).json({ error: "Product not found" });
-    res.json({ message: "Deleted successfully" });
-  } catch (err) {
-    res.status(400).json({ error: "Invalid ID format" });
+    const result = await items.updateOne(
+      { _id: new ObjectId(req.params.id) },
+      { $set: req.body }
+    );
+
+    if (result.matchedCount === 0)
+      return res.status(404).json({ error: "Item not found" });
+
+    res.json({ message: "Partially updated" });
+  } catch {
+    res.status(400).json({ error: "Invalid ID or data" });
   }
 });
-app.get("/health", (req, res) => {
-  res.json({
-    status: "ok"
-  });
+
+
+// DELETE 
+app.delete("/api/items/:id", async (req, res) => {
+  try {
+    const result = await items.deleteOne({ _id: new ObjectId(req.params.id) });
+
+    if (result.deletedCount === 0)
+      return res.status(404).json({ error: "Item not found" });
+
+    res.status(204).send();
+  } catch {
+    res.status(400).json({ error: "Invalid ID" });
+  }
+});
+
+
+app.get("/api/health", (req, res) => {
+  res.json({ status: "ok" });
 });
 
 app.use((req, res) => {
