@@ -151,4 +151,3 @@ app.delete("/api/items/:id", apiKeyAuth, async (req, res) => {
 app.use((req, res) => {
   res.status(404).json({ error: "API endpoint not found" });
 });
-s
