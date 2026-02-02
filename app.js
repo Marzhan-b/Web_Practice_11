@@ -4,20 +4,56 @@ const { MongoClient, ObjectId } = require("mongodb");
 
 const app = express();
 
+// ===== CONFIG =====
 const PORT = process.env.PORT || 3000;
 const MONGO_URL = process.env.MONGO_URI;
+const API_KEY = 'my-secret-api-key';
 
+// ===== DB =====
 const client = new MongoClient(MONGO_URL);
-
 let items;
+
+// ===== MIDDLEWARE =====
+app.use(express.json());
 
 app.use((req, res, next) => {
   console.log(req.method, req.url);
   next();
 });
 
-app.use(express.json());
+// ===== DB CHECK MIDDLEWARE =====
+function checkDb(req, res, next) {
+  if (!items) {
+    return res.status(503).json({
+      error: "Service unavailable",
+      message: "Database not ready"
+    });
+  }
+  next();
+}
 
+// ===== API KEY AUTH MIDDLEWARE =====
+function apiKeyAuth(req, res, next) {
+  const apiKey = req.header("x-api-key");
+
+  if (!apiKey) {
+    return res.status(401).json({
+      error: "Unauthorized",
+      message: "API key is missing"
+    });
+  }
+
+  if (apiKey !== API_KEY) {
+    return res.status(403).json({
+      error: "Forbidden",
+      message: "Invalid API key"
+    });
+  }
+
+  next();
+}
+
+// ===== START SERVER =====
 async function startServer() {
   try {
     await client.connect();
@@ -30,38 +66,50 @@ async function startServer() {
       console.log(`Server running at http://localhost:${PORT}`);
     });
   } catch (error) {
-    console.error(error);
+    console.error("Failed to start server:", error);
   }
 }
 
 startServer();
 
+// ===== ROUTES =====
+
+// root
 app.get("/", (req, res) => {
   res.send("<h1>Items API</h1>");
 });
 
+// health check
+app.get("/api/health", (req, res) => {
+  res.json({ status: "ok" });
+});
 
-// GET 
+// apply DB check to all /api routes
+app.use("/api", checkDb);
+
+// GET all items (public)
 app.get("/api/items", async (req, res) => {
   const list = await items.find().toArray();
   res.status(200).json(list);
 });
 
-
-// GET
+// GET item by id (public)
 app.get("/api/items/:id", async (req, res) => {
   try {
     const item = await items.findOne({ _id: new ObjectId(req.params.id) });
-    if (!item) return res.status(404).json({ error: "Item not found" });
+
+    if (!item) {
+      return res.status(404).json({ error: "Item not found" });
+    }
+
     res.json(item);
   } catch {
     res.status(400).json({ error: "Invalid ID" });
   }
 });
 
-
-// POST 
-app.post("/api/items", async (req, res) => {
+// POST item (protected)
+app.post("/api/items", apiKeyAuth, async (req, res) => {
   const { name } = req.body;
 
   if (!name) {
@@ -72,17 +120,17 @@ app.post("/api/items", async (req, res) => {
   res.status(201).json({ id: result.insertedId });
 });
 
-
-// PUT
-app.put("/api/items/:id", async (req, res) => {
+// PUT item (protected)
+app.put("/api/items/:id", apiKeyAuth, async (req, res) => {
   try {
     const result = await items.updateOne(
       { _id: new ObjectId(req.params.id) },
       { $set: req.body }
     );
 
-    if (result.matchedCount === 0)
+    if (result.matchedCount === 0) {
       return res.status(404).json({ error: "Item not found" });
+    }
 
     res.json({ message: "Updated successfully" });
   } catch {
@@ -90,17 +138,17 @@ app.put("/api/items/:id", async (req, res) => {
   }
 });
 
-
-// PATCH 
-app.patch("/api/items/:id", async (req, res) => {
+// PATCH item (protected)
+app.patch("/api/items/:id", apiKeyAuth, async (req, res) => {
   try {
     const result = await items.updateOne(
       { _id: new ObjectId(req.params.id) },
       { $set: req.body }
     );
 
-    if (result.matchedCount === 0)
+    if (result.matchedCount === 0) {
       return res.status(404).json({ error: "Item not found" });
+    }
 
     res.json({ message: "Partially updated" });
   } catch {
@@ -108,14 +156,16 @@ app.patch("/api/items/:id", async (req, res) => {
   }
 });
 
-
-// DELETE 
-app.delete("/api/items/:id", async (req, res) => {
+// DELETE item (protected)
+app.delete("/api/items/:id", apiKeyAuth, async (req, res) => {
   try {
-    const result = await items.deleteOne({ _id: new ObjectId(req.params.id) });
+    const result = await items.deleteOne({
+      _id: new ObjectId(req.params.id)
+    });
 
-    if (result.deletedCount === 0)
+    if (result.deletedCount === 0) {
       return res.status(404).json({ error: "Item not found" });
+    }
 
     res.status(204).send();
   } catch {
@@ -123,11 +173,7 @@ app.delete("/api/items/:id", async (req, res) => {
   }
 });
 
-
-app.get("/api/health", (req, res) => {
-  res.json({ status: "ok" });
-});
-
+// 404 fallback
 app.use((req, res) => {
   res.status(404).json({ error: "API endpoint not found" });
 });
