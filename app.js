@@ -4,16 +4,13 @@ const { MongoClient, ObjectId } = require("mongodb");
 
 const app = express();
 
-// ===== CONFIG =====
 const PORT = process.env.PORT || 3000;
 const MONGO_URL = process.env.MONGO_URI;
 const API_KEY = 'my-secret-api-key';
 
-// ===== DB =====
 const client = new MongoClient(MONGO_URL);
 let items;
 
-// ===== MIDDLEWARE =====
 app.use(express.json());
 
 app.use((req, res, next) => {
@@ -21,7 +18,6 @@ app.use((req, res, next) => {
   next();
 });
 
-// ===== DB CHECK MIDDLEWARE =====
 function checkDb(req, res, next) {
   if (!items) {
     return res.status(503).json({
@@ -32,7 +28,6 @@ function checkDb(req, res, next) {
   next();
 }
 
-// ===== API KEY AUTH MIDDLEWARE =====
 function apiKeyAuth(req, res, next) {
   const apiKey = req.header("x-api-key");
 
@@ -53,7 +48,6 @@ function apiKeyAuth(req, res, next) {
   next();
 }
 
-// ===== START SERVER =====
 async function startServer() {
   try {
     await client.connect();
@@ -72,28 +66,13 @@ async function startServer() {
 
 startServer();
 
-// ===== ROUTES =====
-
-// root
-app.get("/", (req, res) => {
-  res.send("<h1>Items API</h1>");
-});
-
-// health check
-app.get("/api/health", (req, res) => {
-  res.json({ status: "ok" });
-});
-
-// apply DB check to all /api routes
 app.use("/api", checkDb);
 
-// GET all items (public)
 app.get("/api/items", async (req, res) => {
   const list = await items.find().toArray();
   res.status(200).json(list);
 });
 
-// GET item by id (public)
 app.get("/api/items/:id", async (req, res) => {
   try {
     const item = await items.findOne({ _id: new ObjectId(req.params.id) });
@@ -108,7 +87,6 @@ app.get("/api/items/:id", async (req, res) => {
   }
 });
 
-// POST item (protected)
 app.post("/api/items", apiKeyAuth, async (req, res) => {
   const { name } = req.body;
 
@@ -120,7 +98,6 @@ app.post("/api/items", apiKeyAuth, async (req, res) => {
   res.status(201).json({ id: result.insertedId });
 });
 
-// PUT item (protected)
 app.put("/api/items/:id", apiKeyAuth, async (req, res) => {
   try {
     const result = await items.updateOne(
@@ -138,7 +115,6 @@ app.put("/api/items/:id", apiKeyAuth, async (req, res) => {
   }
 });
 
-// PATCH item (protected)
 app.patch("/api/items/:id", apiKeyAuth, async (req, res) => {
   try {
     const result = await items.updateOne(
@@ -156,7 +132,6 @@ app.patch("/api/items/:id", apiKeyAuth, async (req, res) => {
   }
 });
 
-// DELETE item (protected)
 app.delete("/api/items/:id", apiKeyAuth, async (req, res) => {
   try {
     const result = await items.deleteOne({
@@ -173,7 +148,7 @@ app.delete("/api/items/:id", apiKeyAuth, async (req, res) => {
   }
 });
 
-// 404 fallback
 app.use((req, res) => {
   res.status(404).json({ error: "API endpoint not found" });
 });
+s
